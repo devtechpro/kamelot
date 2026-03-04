@@ -1,6 +1,6 @@
 # Kamelot
 
-A Kotlin DSL on Apache Camel for building API integrations. Spec-first, type-safe, testable.
+Kotlin DSL on Apache Camel for building API integrations. Spec-first, type-safe, testable — with a visual IDE, management plane, and debug tooling.
 
 ## Quick Start
 
@@ -16,10 +16,21 @@ fun main() = execute("echo-service") {
             "source" set "echo-service"
         }
     })
+
+    flow("health", handler { _ ->
+        respond("status" to "ok", "timestamp" to now())
+    })
+
+    triggered("heartbeat") {
+        every(30.seconds)
+        log("echo-service heartbeat — alive")
+    }
 }
 ```
 
-## Adapter Example
+Every integration starts with a spec. Every adapter has a spec. Field mappings are validated against specs. Wrong field name = build error, not runtime crash.
+
+## HTTP Adapters
 
 Call external APIs with typed adapters backed by OpenAPI specs:
 
@@ -46,12 +57,14 @@ fun enrichHandler(usersApi: AdapterRef) = handler { req ->
 }
 ```
 
-## Database-Backed CRUD
+## Database Adapters
+
+Postgres CRUD with declarative step-based flows:
 
 ```kotlin
 fun main() = execute("products-api") {
     val api = spec("specs/products-openapi.yaml")
-    expose(api, port = 5500)
+    expose(api, port = env("PORT", 5500))
 
     val db = adapter("products-db", spec("specs/products-db-spec.yaml")) {
         postgres {
@@ -75,9 +88,48 @@ fun main() = execute("products-api") {
 }
 ```
 
-## Managed Runtime
+Three adapter backends: `CamelHttpBackend` (default), `PostgresBackend`, and `InMemoryBackend` (testing).
 
-Run multiple integrations under a management plane:
+## Error Handling
+
+Retry with exponential backoff and Resilience4j circuit breakers:
+
+```kotlin
+flow("enrich") {
+    onError {
+        retry { maxAttempts = 3; delayMs = 500; backoffMultiplier = 2.0 }
+        circuitBreaker { failureRateThreshold = 50f; waitDurationInOpenStateMs = 30_000 }
+    }
+    handle(enrichHandler(usersApi))
+}
+```
+
+## Built-in Functions
+
+Available in handlers and `process {}` steps:
+
+| Category | Functions |
+|----------|-----------|
+| **String** | `slugify()`, `capitalize()`, `camelize()`, `dasherize()`, `truncate()`, `mask()`, `initials()` |
+| **Date** | `now()`, `today()`, `epochMs()`, `formatDate()`, `parseDate()`, `dateAdd()`, `dateDiff()` |
+| **Crypto** | `uuid()`, `md5()`, `sha256()`, `hmacSha256()`, `base64Encode()`, `base64Decode()` |
+| **Collection** | `map.pick()`, `map.omit()`, `map.rename()`, `map.nested()`, `map.pickNonNull()` |
+| **Config** | `env("KEY", default)`, `secret("KEY", default)` |
+
+## Per-Integration Infrastructure
+
+Every integration automatically gets:
+
+- **Trace IDs** — MDC-based, propagated via `X-Trace-Id` header
+- **Structured logging** — request in, response out, errors tagged by integration + operation
+- **Prometheus metrics** — `/metrics` endpoint with call counts, durations, error rates, JVM stats
+- **OpenAPI spec** — `/openapi.json` serves the spec
+- **Error handling** — retry with backoff + circuit breaker (configurable per flow)
+- **Debug API** — `/debug/*` endpoints for traces, breakpoints, pause/resume (when `INTEGRATION_DEBUG=true`)
+
+## Management Plane
+
+Run multiple integrations under one orchestrator:
 
 ```kotlin
 fun main() = manage(port = 9000) {
@@ -85,19 +137,39 @@ fun main() = manage(port = 9000) {
         deploy(EchoFactory())
         deploy(EnrichmentFactory())
     }
+    remoteAgent("payment-services", "http://payments:8081")
 }
 ```
+
+REST API at port 9000:
+- `POST /mgmt/artifacts` — upload JAR
+- `POST /mgmt/deployments` — deploy artifact or inline
+- `POST /mgmt/deployments/{id}/start|stop` — lifecycle control
+- `GET /mgmt/health` — aggregate health
+- `GET /mgmt/events` — event log
+
+Supports local agents (in-JVM) and remote agents (separate JVM with AgentApi).
+
+## Visual IDE
+
+Design integrations visually with the Studio IDE:
+
+- **Studio Desktop** (`ide/studio`) — Kotlin/Compose app with embedded Camel runtime
+- **Web Frontend** (`ide/frontend`) — Vue 3 SPA with flow canvas, spec browser, field mapping, database browser
+- **BFF** (`ide/bff`) — Bun/TypeScript backend for the web UI
+
+Features: project tree, OpenAPI spec viewer, flow editor with step palette, field mapping panel, database table browser, DSL code generation, run/stop with live logs.
 
 ## Modules
 
 | Module | Description |
 |--------|-------------|
-| `core` | DSL builders, model, Camel route generation, spec engine |
-| `runtime` | Standalone `execute()` entry point |
-| `management` | Management plane, agents, artifact deployment |
-| `ide/studio` | Desktop IDE (Kotlin/Compose) |
+| `core` | DSL builders, model, Camel route generation, spec engine, adapters, functions |
+| `runtime` | Standalone `execute()` entry point (Camel Main) |
+| `management` | Management plane, agents, artifact store, deployment lifecycle |
+| `ide/studio` | Desktop IDE with embedded runtime (Kotlin/Compose) |
 | `ide/bff` | IDE backend-for-frontend (Bun/TypeScript) |
-| `ide/frontend` | IDE web UI (Vue) |
+| `ide/frontend` | IDE web UI (Vue 3) |
 | `examples/*` | Echo, enrichment, contacts, products, managed |
 
 ## Building
@@ -110,6 +182,5 @@ Requires JDK 21+.
 
 ## Documentation
 
-- [SPEC.md](SPEC.md) — Full specification
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Internals, Camel mapping, module structure
 - [EXAMPLES.md](EXAMPLES.md) — Integration examples

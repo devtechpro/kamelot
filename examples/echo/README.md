@@ -239,15 +239,20 @@ examples/echo/
 ## DSL Overview
 
 ```kotlin
-val echoIntegration = integration("echo-service") {
+fun main() = execute("echo-service") {
     version = 1
-    description = "Simple echo service — returns what you send it"
+    description = "Echo service with periodic heartbeat"
 
-    val api = spec("examples/echo/specs/echo-openapi.yaml")
-    val gw = expose(api, port = 5400)
+    val api = spec("specs/echo-openapi.yaml")
+    expose(api, port = 5400)
 
-    gw["echo"] = echoHandler
-    gw["health"] = healthHandler
+    flow("echo", echoHandler)
+    flow("health", healthHandler)
+
+    triggered("heartbeat") {
+        every(30.seconds)
+        log("echo-service heartbeat — alive")
+    }
 }
 ```
 

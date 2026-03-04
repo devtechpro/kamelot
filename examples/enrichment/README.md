@@ -307,17 +307,17 @@ examples/enrichment/
 ## DSL Overview
 
 ```kotlin
-val enrichmentIntegration = integration("user-enrichment") {
+fun main() = execute("user-enrichment") {
     version = 1
     description = "Enriches user data from JSONPlaceholder"
 
-    val api = spec("examples/enrichment/specs/enrichment-openapi.yaml")
-    val gw = expose(api, port = 5401)
+    val api = spec("specs/enrichment-openapi.yaml")
+    expose(api, port = 5401)
 
-    val usersApi = adapter("jsonplaceholder", spec("examples/enrichment/specs/jsonplaceholder-openapi.yaml")) {
+    val usersApi = adapter("jsonplaceholder", spec("specs/jsonplaceholder-openapi.yaml")) {
         baseUrl = "https://jsonplaceholder.typicode.com"
     }
 
-    gw["enrich"] = enrichHandler(usersApi)
+    flow("enrich", enrichHandler(usersApi))
 }
 ```
