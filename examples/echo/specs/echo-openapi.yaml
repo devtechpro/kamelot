@@ -1,0 +1,77 @@
+openapi: 3.0.3
+info:
+  title: Echo Service
+  description: Simple echo service — returns what you send it.
+  version: "1.0"
+
+paths:
+  /echo:
+    post:
+      operationId: echo
+      summary: Echo back the request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EchoRequest'
+      responses:
+        '200':
+          description: Echoed response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EchoResponse'
+
+  /health:
+    get:
+      operationId: health
+      summary: Service health check
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    EchoRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: The message to echo back
+
+    EchoResponse:
+      type: object
+      required:
+        - message
+        - timestamp
+        - source
+      properties:
+        message:
+          type: string
+          description: The echoed message
+        timestamp:
+          type: string
+          format: date-time
+          description: Server timestamp
+        source:
+          type: string
+          description: Service identifier
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: Service status
+        uptime:
+          type: string
+          description: Service uptime

@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: Test External API
+  description: Minimal spec for adapter unit tests.
+  version: "1.0"
+
+paths:
+  /items/{id}:
+    get:
+      operationId: getItem
+      summary: Get an item by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Item data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+
+  /items:
+    post:
+      operationId: createItem
+      summary: Create an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Item'
+      responses:
+        '201':
+          description: Created item
+
+components:
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        value:
+          type: number

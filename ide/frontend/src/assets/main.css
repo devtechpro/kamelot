@@ -1,0 +1,189 @@
+:root {
+  /* Warm sand — light, airy, paper-like */
+  --bg-primary: #faf7f2;
+  --bg-secondary: #f3efe8;
+  --bg-surface: #edeade;
+  --bg-hover: #e5e0d6;
+  --bg-active: #dbd5c9;
+  --border: #d4cec2;
+  --border-subtle: #e5e0d6;
+  --text-primary: #3d3529;
+  --text-secondary: #6b6155;
+  --text-muted: #9c9284;
+  --accent: #b07d4f;
+  --accent-hover: #9a6a3e;
+  --accent-subtle: rgba(176, 125, 79, 0.08);
+  --green: #5c8a4a;
+  --blue: #4a7a9c;
+  --purple: #7a5c9c;
+  --yellow: #9c8a3a;
+  --red: #b05050;
+  --orange: #b07d4f;
+  --teal: #4a8a7a;
+
+  /* Step type colors */
+  --step-process: #4a7a9c;
+  --step-process-bg: rgba(74, 122, 156, 0.08);
+  --step-call: #5c8a4a;
+  --step-call-bg: rgba(92, 138, 74, 0.08);
+  --step-log: #9c9284;
+  --step-log-bg: rgba(156, 146, 132, 0.06);
+  --step-respond: #7a5c9c;
+  --step-respond-bg: rgba(122, 92, 156, 0.08);
+  --step-map: #b07d4f;
+  --step-map-bg: rgba(176, 125, 79, 0.08);
+
+  /* Method colors */
+  --method-get: #5c8a4a;
+  --method-post: #4a7a9c;
+  --method-put: #b07d4f;
+  --method-patch: #9c8a3a;
+  --method-delete: #b05050;
+
+  --font-mono: 'Berkeley Mono', 'SF Mono', 'Menlo', 'Consolas', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+
+  --radius: 6px;
+  --radius-sm: 4px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Splitpanes — minimal chrome */
+.splitpanes {
+  background: var(--bg-primary) !important;
+}
+
+.splitpanes__splitter {
+  background: var(--border) !important;
+  position: relative;
+}
+
+.splitpanes--horizontal > .splitpanes__splitter {
+  height: 1px !important;
+  min-height: 1px !important;
+}
+
+.splitpanes--vertical > .splitpanes__splitter {
+  width: 1px !important;
+  min-width: 1px !important;
+}
+
+.splitpanes__splitter:hover {
+  background: var(--accent) !important;
+}
+
+/* Scrollbar — thin, quiet */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Buttons — understated */
+button {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: color 0.1s, background 0.1s;
+}
+
+button:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+button.primary:hover {
+  background: var(--accent-hover);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Inputs — quiet, blends in */
+input, textarea, select {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  outline: none;
+  width: 100%;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+}
+
+textarea {
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.panel-body {
+  padding: 12px;
+  overflow-y: auto;
+  height: calc(100% - 33px);
+}

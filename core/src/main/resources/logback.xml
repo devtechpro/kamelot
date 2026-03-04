@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) [%thread] %cyan(%logger{36}) %yellow(%mdc{traceId:---------}) — %msg%n%xException</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Integration framework: DEBUG -->
+    <logger name="io.devtech.integration" level="DEBUG" />
+
+    <!-- Camel: INFO (set to DEBUG for route-level tracing) -->
+    <logger name="org.apache.camel" level="INFO" />
+
+    <!-- Undertow: WARN (noisy at INFO) -->
+    <logger name="io.undertow" level="WARN" />
+    <logger name="org.xnio" level="WARN" />
+    <logger name="org.jboss" level="WARN" />
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>

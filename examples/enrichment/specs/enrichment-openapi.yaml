@@ -1,0 +1,68 @@
+openapi: 3.0.3
+info:
+  title: User Enrichment Service
+  description: Enriches user data by fetching from external APIs and mapping fields.
+  version: "1.0"
+
+paths:
+  /enrich:
+    post:
+      operationId: enrich
+      summary: Enrich a user by ID
+      description: Fetches user data from JSONPlaceholder and returns mapped/enriched fields.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrichRequest'
+      responses:
+        '200':
+          description: Enriched user data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichResponse'
+
+components:
+  schemas:
+    EnrichRequest:
+      type: object
+      required:
+        - userId
+      properties:
+        userId:
+          type: integer
+          description: The user ID to look up and enrich
+
+    EnrichResponse:
+      type: object
+      required:
+        - fullName
+        - emailAddress
+      properties:
+        fullName:
+          type: string
+          description: User's full name (mapped from external 'name')
+        emailAddress:
+          type: string
+          description: User's email (mapped from external 'email')
+        phone:
+          type: string
+          description: User's phone number
+        city:
+          type: string
+          description: User's city (mapped from external 'address.city')
+        company:
+          type: string
+          description: User's company name (mapped from external 'company.name')
+        website:
+          type: string
+          description: User's website
+        source:
+          type: string
+          description: Data source identifier
+        enrichedAt:
+          type: string
+          format: date-time
+          description: Timestamp of enrichment

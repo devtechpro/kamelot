@@ -1,0 +1,19 @@
+{
+  "name": "integration-studio-bff",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "hono": "^4.6.0",
+    "@apidevtools/swagger-parser": "^10.1.1",
+    "yaml": "^2.7.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: JSONPlaceholder Users API
+  description: |
+    Interface spec for the JSONPlaceholder /users endpoint.
+    Written by us to enforce a typed contract for the external API.
+    Source: https://jsonplaceholder.typicode.com
+  version: "1.0"
+
+paths:
+  /users/{id}:
+    get:
+      operationId: getUser
+      summary: Get a user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users:
+    get:
+      operationId: listUsers
+      summary: List all users
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        website:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        company:
+          $ref: '#/components/schemas/Company'
+
+    Address:
+      type: object
+      properties:
+        street:
+          type: string
+        suite:
+          type: string
+        city:
+          type: string
+        zipcode:
+          type: string
+        geo:
+          $ref: '#/components/schemas/Geo'
+
+    Geo:
+      type: object
+      properties:
+        lat:
+          type: string
+        lng:
+          type: string
+
+    Company:
+      type: object
+      properties:
+        name:
+          type: string
+        catchPhrase:
+          type: string
+        bs:
+          type: string
