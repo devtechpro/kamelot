@@ -5,10 +5,12 @@ import { useUiStore } from '@/stores/ui'
 import NewProjectDialog from '@/components/tree/NewProjectDialog.vue'
 import SpecUploadDialog from '@/components/tree/SpecUploadDialog.vue'
 import ConnectorDialog from '@/components/tree/ConnectorDialog.vue'
+import { useChatStore } from '@/stores/chat'
 
 const projectStore = useProjectStore()
 const canvas = useCanvasStore()
 const ui = useUiStore()
+const chatStore = useChatStore()
 </script>
 
 <template>
@@ -51,6 +53,14 @@ const ui = useUiStore()
       </template>
     </div>
     <div class="toolbar-right">
+      <button
+        v-if="projectStore.currentProject && chatStore.chatAvailable"
+        :class="['chat-btn', { active: ui.chatPanelVisible }]"
+        @click="ui.toggleChat()"
+        title="Toggle AI Assistant"
+      >
+        AI Chat
+      </button>
       <button @click="ui.showNewProject = true">New project</button>
       <button v-if="projectStore.currentProject" @click="ui.showSpecUpload = true">Add spec</button>
     </div>
@@ -167,5 +177,25 @@ const ui = useUiStore()
 .toolbar-right {
   display: flex;
   gap: 4px;
+}
+
+.chat-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.chat-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chat-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 </style>

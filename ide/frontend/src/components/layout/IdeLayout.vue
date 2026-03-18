@@ -8,9 +8,15 @@ import CenterPanel from '@/components/layout/CenterPanel.vue'
 import PropertiesPanel from '@/components/properties/PropertiesPanel.vue'
 import RuntimePanel from '@/components/runtime/RuntimePanel.vue'
 import Toolbar from '@/components/layout/Toolbar.vue'
+import ChatPanel from '@/components/chat/ChatPanel.vue'
+import { useChatStore } from '@/stores/chat'
 
 const ui = useUiStore()
 const projectStore = useProjectStore()
+const chatStore = useChatStore()
+
+// Check chat availability on mount
+chatStore.checkAvailability()
 </script>
 
 <template>
@@ -34,6 +40,10 @@ const projectStore = useProjectStore()
       <div class="divider" v-if="projectStore.currentProject"></div>
       <div class="sidebar-right" v-if="projectStore.currentProject">
         <PropertiesPanel />
+      </div>
+      <div class="divider" v-if="ui.chatPanelVisible"></div>
+      <div class="sidebar-chat" v-if="ui.chatPanelVisible">
+        <ChatPanel />
       </div>
     </div>
   </div>
@@ -69,6 +79,13 @@ const projectStore = useProjectStore()
 .sidebar-right {
   width: 280px;
   min-width: 200px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.sidebar-chat {
+  width: 320px;
+  min-width: 240px;
   flex-shrink: 0;
   overflow: hidden;
 }

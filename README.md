@@ -160,6 +160,44 @@ Design integrations visually with the Studio IDE:
 
 Features: project tree, OpenAPI spec viewer, flow editor with step palette, field mapping panel, database table browser, DSL code generation, run/stop with live logs.
 
+## AI Chat Assistant
+
+The IDE includes an embedded AI assistant powered by Claude Code. It can create flows, add steps, configure connectors, and explain your project — all through natural language.
+
+No API keys needed. It runs on your local Claude Code subscription.
+
+### Setup
+
+**Prerequisites:**
+- [Bun](https://bun.sh) — `curl -fsSL https://bun.sh/install | bash`
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code`
+- Active Claude Code subscription (Pro, Max, or Team), logged in via `claude auth`
+
+**Run:**
+
+```bash
+# Terminal 1 — backend
+cd ide/bff
+npm install
+bun run dev          # → :5531
+
+# Terminal 2 — frontend
+cd ide/frontend
+npm install
+npm run dev          # → :5530
+```
+
+Open http://localhost:5530, open a project, click **AI Chat** in the toolbar.
+
+### How it works
+
+1. User sends a message in the chat panel
+2. The BFF builds a system prompt with the full project context (specs, flows, adapters, DSL)
+3. The BFF spawns `claude -p` as a subprocess — using your local Claude Code auth
+4. Claude reads and edits the project JSON file on disk using its built-in tools
+5. Response tokens stream back to the browser via SSE
+6. When done, the frontend reloads the project and the canvas updates
+
 ## Modules
 
 | Module | Description |
