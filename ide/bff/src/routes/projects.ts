@@ -118,14 +118,55 @@ app.delete('/:id/specs/:specId', async (c) => {
   return c.json({ deleted: true })
 })
 
-// Test connector connection
-app.post('/:id/connectors/test', async (c) => {
-  const body = await c.req.json<{ type: string; postgres?: { url: string; username: string; password?: string } }>()
-  if (body.type !== 'postgres') {
-    return c.json({ ok: false, error: 'Only postgres test is supported' }, 400)
+// --- Studio backend proxy (runner, connectors, DB) ---
+const STUDIO_URL = 'http://localhost:5532'
+
+async function proxyToStudio(c: any, method: string, path: string) {
+  try {
+    const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' } }
+    if (method !== 'GET') {
+      opts.body = await c.req.text()
+    }
+    const res = await fetch(`${STUDIO_URL}${path}`, opts)
+    const body = await res.text()
+    return new Response(body, {
+      status: res.status,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  } catch {
+    return c.json({ error: 'Studio backend not available (port 5532)' }, 502)
   }
-  // BFF forwards to Kotlin backend when available; standalone BFF returns not-implemented
-  return c.json({ ok: false, error: 'Test connection requires the Kotlin backend' })
+}
+
+// Test connector connection → proxy to Studio
+app.post('/:id/connectors/test', (c) =>
+  proxyToStudio(c, 'POST', `/api/projects/${c.req.param('id')}/connectors/test`))
+
+// DB introspection → proxy to Studio
+app.get('/:id/connectors/:adapterId/tables', (c) =>
+  proxyToStudio(c, 'GET', `/api/projects/${c.req.param('id')}/connectors/${c.req.param('adapterId')}/tables`))
+
+app.get('/:id/connectors/:adapterId/tables/:table/columns', (c) =>
+  proxyToStudio(c, 'GET', `/api/projects/${c.req.param('id')}/connectors/${c.req.param('adapterId')}/tables/${encodeURIComponent(c.req.param('table'))}/columns`))
+
+app.get('/:id/connectors/:adapterId/tables/:table/rows', (c) => {
+  const query = c.req.url.includes('?') ? '?' + c.req.url.split('?')[1] : ''
+  return proxyToStudio(c, 'GET', `/api/projects/${c.req.param('id')}/connectors/${c.req.param('adapterId')}/tables/${encodeURIComponent(c.req.param('table'))}/rows${query}`)
+})
+
+// Runner → proxy to Studio
+app.post('/:id/run', (c) =>
+  proxyToStudio(c, 'POST', `/api/projects/${c.req.param('id')}/run`))
+
+app.post('/:id/stop', (c) =>
+  proxyToStudio(c, 'POST', `/api/projects/${c.req.param('id')}/stop`))
+
+app.get('/:id/status', (c) =>
+  proxyToStudio(c, 'GET', `/api/projects/${c.req.param('id')}/status`))
+
+app.get('/:id/logs', (c) => {
+  const query = c.req.url.includes('?') ? '?' + c.req.url.split('?')[1] : ''
+  return proxyToStudio(c, 'GET', `/api/projects/${c.req.param('id')}/logs${query}`)
 })
 
 // Generate DSL

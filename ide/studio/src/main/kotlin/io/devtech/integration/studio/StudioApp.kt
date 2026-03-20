@@ -32,7 +32,7 @@ fun main() {
 }
 
 class StudioApp(
-    private val port: Int = 5531,
+    private val port: Int = 5532,
     private val host: String = "0.0.0.0",
 ) {
     private val log = LoggerFactory.getLogger("studio")
