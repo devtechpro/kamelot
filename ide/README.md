@@ -57,14 +57,12 @@ npm install
 Create a `.env.local` file in the project root (never commit this file):
 
 ```
-# Required for live route execution (free tier available at aviationstack.com)
-AVIATIONSTACK_API_KEY=your_key_here
 
 # Optional — only needed if you are NOT using Claude Code CLI
 # ANTHROPIC_API_KEY=sk-ant-...
 
 # Optional — override with a self-hosted Kroki instance
-# KROKI_URL=https://kroki.io
+KROKI_URL=https://kroki.io
 ```
 
 ### 3. LLM authentication — two options
