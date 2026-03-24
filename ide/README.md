@@ -48,7 +48,7 @@ Install these before running the project:
 
 ```bash
 git clone <repo-url>
-cd kamelot-author
+cd ide
 npm install
 ```
 
