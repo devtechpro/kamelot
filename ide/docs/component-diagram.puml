@@ -1,0 +1,145 @@
+@startuml Kamelot Author - Component Diagram
+
+skinparam componentStyle rectangle
+skinparam backgroundColor #FAFAFA
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #334155
+  FontColor #1E293B
+}
+skinparam package {
+  BackgroundColor #F1F5F9
+  BorderColor #94A3B8
+  FontColor #1E293B
+}
+skinparam arrow {
+  Color #F59E0B
+  FontColor #475569
+  FontSize 11
+}
+skinparam note {
+  BackgroundColor #FEF3C7
+  BorderColor #F59E0B
+}
+
+title Kamelot Author — Component Diagram
+
+actor "Requirement Engineer\n/ Analyst / Developer" as User
+
+package "Browser" {
+  [page.tsx\n(Single Page App)] as Page
+  [PromptInput] as PromptInput
+  [YamlEditor\n(Monaco, read-only)] as YamlEditor
+  [RouteCanvas\n(React Flow)] as RouteCanvas
+  [SequenceDiagram\n(Kroki iframe)] as SeqDiag
+  [TestPanel] as TestPanel
+  [FileTree] as FileTree
+  [NodeDetailDrawer] as NodeDetail
+}
+
+package "Next.js API Routes" {
+  [/api/generate] as GenAPI
+  [/api/execute] as ExecAPI
+  [/api/validate] as ValAPI
+  [/api/projects] as ProjAPI
+}
+
+package "lib / Interfaces" {
+  interface ILLMProvider
+  interface IRouteExecutor
+  interface IDiagramRenderer
+  interface ICredentialProvider
+  interface IProjectStore
+}
+
+package "lib / Providers" {
+  [AnthropicProvider] as Anthropic
+  [JBangExecutor] as JBang
+  [KrokiRenderer] as Kroki
+  [EnvCredentialProvider] as EnvCred
+  [FsProjectStore] as FsStore
+}
+
+package "lib / Core" {
+  [llm.ts\n(prompt templates)] as LLM
+  [jbang.ts\n(process manager)] as JBangMgr
+  [camel-parser.ts\n(YAML → graph)] as Parser
+  [kroki.ts\n(encode → URL)] as KrokiLib
+}
+
+cloud "External Services" {
+  [Anthropic Claude Sonnet API] as ClaudeAPI
+  [AviationStack REST API] as AvAPI
+  [Kroki.io\n(PlantUML → SVG)] as KrokiSvc
+}
+
+node "Host OS" {
+  [Camel JBang\n(persistent process)] as CamelJBang
+  [.env.local\n(credentials)] as EnvFile
+}
+
+' UI wiring
+User --> Page
+Page --> PromptInput
+Page --> YamlEditor
+Page --> RouteCanvas
+Page --> SeqDiag
+Page --> TestPanel
+Page --> FileTree
+
+' Frontend → API
+PromptInput --> GenAPI : POST prompt / PlantUML
+TestPanel --> ExecAPI : POST YAML
+GenAPI --> ValAPI : internal validate
+FileTree --> ProjAPI : CRUD projects
+
+' API → Interfaces
+GenAPI --> ILLMProvider
+ExecAPI --> IRouteExecutor
+GenAPI --> IDiagramRenderer
+GenAPI --> ICredentialProvider
+ProjAPI --> IProjectStore
+
+' Interfaces → Implementations
+ILLMProvider <|.. Anthropic
+IRouteExecutor <|.. JBang
+IDiagramRenderer <|.. Kroki
+ICredentialProvider <|.. EnvCred
+IProjectStore <|.. FsStore
+
+' Implementations → Core libs
+Anthropic --> LLM
+JBang --> JBangMgr
+Kroki --> KrokiLib
+
+' Core → External
+LLM --> ClaudeAPI : Anthropic SDK
+JBangMgr --> CamelJBang : child_process
+KrokiLib --> KrokiSvc : HTTPS GET
+CamelJBang --> AvAPI : HTTP GET /v1/flights
+
+' Credential injection
+EnvCred --> EnvFile : reads
+EnvCred --> JBangMgr : injects API key\nas JVM property
+
+' Parse YAML for canvas
+GenAPI --> Parser : parses YAML
+Parser --> RouteCanvas : nodes + edges
+
+' Kroki URL to browser
+KrokiLib --> SeqDiag : SVG URL
+
+note right of CamelJBang
+  Pre-warmed on startup.
+  Executes generated YAML route.
+  Timeout: 20s.
+end note
+
+note right of EnvFile
+  ANTHROPIC_API_KEY
+  AVIATIONSTACK_API_KEY
+  KROKI_URL
+  Never committed.
+end note
+
+@enduml

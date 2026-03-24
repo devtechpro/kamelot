@@ -1,0 +1,148 @@
+@startuml Kamelot Author - Usage Sequence Diagram
+
+skinparam backgroundColor #FAFAFA
+skinparam sequenceArrowThickness 2
+skinparam sequenceArrowColor #F59E0B
+skinparam sequenceLifeLineBorderColor #334155
+skinparam sequenceLifeLineBackgroundColor #F8FAFC
+skinparam participant {
+  BackgroundColor #FFFFFF
+  BorderColor #334155
+  FontColor #1E293B
+}
+skinparam actor {
+  BorderColor #334155
+  FontColor #1E293B
+}
+skinparam note {
+  BackgroundColor #FEF3C7
+  BorderColor #F59E0B
+  FontColor #1E293B
+}
+skinparam divider {
+  BackgroundColor #E2E8F0
+  BorderColor #94A3B8
+  FontColor #475569
+}
+
+title Kamelot Author — Usage Sequence Diagram
+
+actor "User\n(RE / Analyst / Dev)" as User
+participant "Browser\n(Next.js UI)" as UI
+participant "/api/generate" as GenAPI
+participant "AnthropicProvider\n(ILLMProvider)" as LLM
+participant "Claude Sonnet API" as Claude
+participant "camel-parser.ts" as Parser
+participant "KrokiRenderer\n(IDiagramRenderer)" as Kroki
+participant "kroki.io" as KrokiSvc
+participant "/api/validate" as ValAPI
+participant "/api/execute" as ExecAPI
+participant "JBangExecutor\n(IRouteExecutor)" as JBangEx
+participant "Camel JBang\n(persistent)" as JBang
+participant "AviationStack API" as Aviation
+
+== Startup ==
+
+JBang -> JBang : pre-warm process\n(on server start)
+note right : First execution is fast\nbecause JBang is already running
+
+== Step 1: User Describes Integration ==
+
+User -> UI : types integration prompt\n"Get all international flights arriving\nat Dubai International Airport..."
+UI -> UI : enable Generate button
+
+alt Optional: PlantUML upload
+  User -> UI : uploads .puml file
+  UI -> UI : show "PlantUML uploaded" badge
+end
+
+== Step 2: Generate Route ==
+
+User -> UI : clicks [Generate]
+UI -> UI : disable Generate button\nshow loading spinner
+UI -> GenAPI : POST /api/generate\n{ prompt | plantuml }
+
+GenAPI -> LLM : generateRoute(prompt)
+LLM -> Claude : Anthropic SDK call\n(system prompt + user prompt)
+
+note over Claude
+  Generates in one response:
+  1. Apache Camel YAML DSL route
+  2. PlantUML sequence diagram
+  Returns strict JSON: { yaml, plantuml }
+end note
+
+Claude --> LLM : { yaml: "...", plantuml: "@startuml..." }
+LLM --> GenAPI : { yaml, plantuml }
+
+== Step 3: Validate Route (internal) ==
+
+GenAPI -> ValAPI : POST /api/validate { yaml }
+ValAPI --> GenAPI : { valid: true | errors: [...] }
+
+== Step 4: Encode Diagram ==
+
+GenAPI -> Kroki : renderDiagram(plantuml)
+Kroki -> Kroki : base64-encode PlantUML
+Kroki -> KrokiSvc : GET /plantuml/svg/<encoded>
+KrokiSvc --> Kroki : SVG image
+Kroki --> GenAPI : svgUrl
+
+== Step 5: Parse YAML → Graph ==
+
+GenAPI -> Parser : parseYaml(yaml)
+Parser --> GenAPI : { nodes[], edges[] }
+
+GenAPI --> UI : { yaml, plantuml, svgUrl, nodes, edges }
+
+== Step 6: Populate UI ==
+
+UI -> UI : fade-in result panels
+UI -> UI : [YAML tab] render in Monaco editor\n(read-only, syntax highlighted)
+UI -> UI : [Flow tab] render React Flow canvas\nfrom nodes + edges
+UI -> UI : [Sequence tab] render SVG\nfrom svgUrl (Kroki)
+UI -> UI : enable Test Route button
+UI -> UI : re-enable Generate button
+
+note over UI
+  Developer View: Flow diagram + YAML
+  Analyst View: Sequence diagram
+  User can switch tabs freely
+end note
+
+User -> UI : reviews generated route\n(Flow / YAML / Sequence tabs)
+
+== Step 7: Test the Route ==
+
+User -> UI : clicks [Test Route]
+UI -> UI : disable Test button\nshow "Executing..." in TestPanel
+UI -> ExecAPI : POST /api/execute { yaml }
+
+ExecAPI -> JBangEx : execute(yaml)
+JBangEx -> JBangEx : write YAML to /tmp/kamelot/<id>.yaml\ninject AVIATIONSTACK_API_KEY as JVM property
+JBangEx -> JBang : run <file>.yaml --max-seconds=15\n-Daviationstack.api.key=***
+
+JBang -> Aviation : GET /v1/flights\n?access_key=***&arr_iata=DXB&flight_status=active
+Aviation --> JBang : JSON payload\n(flight records)
+
+JBang -> JBang : unmarshal JSON\nlog result
+
+JBang --> JBangEx : stdout + stderr
+JBangEx --> ExecAPI : { output, exitCode }
+
+alt JBang not installed
+  JBangEx --> ExecAPI : { error: "JBang not installed" }
+  ExecAPI --> UI : 503 { message: "JBang not installed.\nPlease install JBang to run routes." }
+  UI -> UI : show error in TestPanel
+else Timeout (>20s)
+  JBangEx --> ExecAPI : { output: partial, timeout: true }
+  ExecAPI --> UI : 200 { output: partial, timeout: true }
+  UI -> UI : show partial output + timeout warning
+else Success
+  ExecAPI --> UI : 200 { output, exitCode: 0 }
+  UI -> UI : stream real flight data\ninto TestPanel\n(flight number, airline,\norigin city, arrival time)
+end
+
+User -> UI : reads real flight results
+
+@enduml

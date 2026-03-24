@@ -24,3 +24,8 @@ Thumbs.db
 
 # Claude
 .claude/
+
+.next/
+dist/
+node_modules/
+*.tsbuildinfo
