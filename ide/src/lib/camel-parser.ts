@@ -1,6 +1,7 @@
 import yaml from 'js-yaml'
 import type { Node, Edge } from '@xyflow/react'
 import { MarkerType, Position } from '@xyflow/react'
+import type { StepKind } from '@/lib/interfaces/INodeData'
 
 export interface CamelFlowData {
   nodes: Node[]
@@ -100,6 +101,8 @@ interface StepInfo {
   uri: string
   params: Record<string, string>
   component: string
+  stepKind: StepKind
+  rawStep: Record<string, unknown>
 }
 
 function extractToInfo(
@@ -125,11 +128,15 @@ function extractToInfo(
 
   if (!uri) return null
   const component = componentFromUri(uri)
+  const stepKind: StepKind = isDynamic ? 'toD' : 'to'
+  const rawStep: Record<string, unknown> =
+    typeof raw === 'string' ? { uri: raw } : (raw as Record<string, unknown>)
+
   if (component === 'log') {
-    return { label: uriToLabel(uri), colour: '#64748B', uri, params, component }
+    return { label: uriToLabel(uri), colour: '#64748B', uri, params, component, stepKind, rawStep }
   }
   const colour = isDynamic ? '#2563EB' : '#3B82F6'
-  return { label: uriToLabel(uri), colour, uri, params, component }
+  return { label: uriToLabel(uri), colour, uri, params, component, stepKind, rawStep }
 }
 
 function extractStepInfo(step: Record<string, unknown>): StepInfo | null {
@@ -151,68 +158,61 @@ function extractStepInfo(step: Record<string, unknown>): StepInfo | null {
     if (typeof logObj.message === 'string') params.message = logObj.message
     if (typeof logObj.loggingLevel === 'string') params.loggingLevel = logObj.loggingLevel
     if (typeof logObj.logName === 'string') params.logName = logObj.logName
-    return { label: uri, colour: '#64748B', uri, params, component: 'log' }
+    return { label: uri, colour: '#64748B', uri, params, component: 'log', stepKind: 'log', rawStep: logObj }
   }
 
   if ('unmarshal' in step) {
-    const um = step.unmarshal as Record<string, unknown> | undefined
-    const format = um && typeof um === 'object' && Object.keys(um).length > 0 ? Object.keys(um)[0] : 'json'
-    return { label: 'unmarshal', colour: '#8B5CF6', uri: 'unmarshal', params: { format }, component: 'unmarshal' }
+    const um = (step.unmarshal ?? {}) as Record<string, unknown>
+    const format = typeof um === 'object' && Object.keys(um).length > 0 ? Object.keys(um)[0] : 'json'
+    return { label: 'unmarshal', colour: '#8B5CF6', uri: 'unmarshal', params: { format }, component: 'unmarshal', stepKind: 'unmarshal', rawStep: um }
   }
 
   if ('marshal' in step) {
-    const m = step.marshal as Record<string, unknown> | undefined
-    const format = m && typeof m === 'object' && Object.keys(m).length > 0 ? Object.keys(m)[0] : 'json'
-    return { label: 'marshal', colour: '#8B5CF6', uri: 'marshal', params: { format }, component: 'marshal' }
+    const m = (step.marshal ?? {}) as Record<string, unknown>
+    const format = typeof m === 'object' && Object.keys(m).length > 0 ? Object.keys(m)[0] : 'json'
+    return { label: 'marshal', colour: '#8B5CF6', uri: 'marshal', params: { format }, component: 'marshal', stepKind: 'marshal', rawStep: m }
   }
 
   if ('transform' in step) {
-    const t = step.transform as Record<string, unknown> | undefined
+    const t = (step.transform ?? {}) as Record<string, unknown>
     const params: Record<string, string> = {}
-    if (t && typeof t === 'object') {
-      if (typeof t.simple === 'string') params.simple = t.simple
-      else if (typeof t.jq === 'string') params.jq = t.jq
-      else if (typeof t.constant === 'string') params.constant = t.constant
-    }
-    return { label: 'transform', colour: '#8B5CF6', uri: 'transform', params, component: 'transform' }
+    if (typeof t.simple === 'string') params.simple = t.simple
+    else if (typeof t.jq === 'string') params.jq = t.jq
+    else if (typeof t.constant === 'string') params.constant = t.constant
+    return { label: 'transform', colour: '#8B5CF6', uri: 'transform', params, component: 'transform', stepKind: 'transform', rawStep: t }
   }
 
   if ('filter' in step) {
-    const filterObj = step.filter as Record<string, unknown> | undefined
+    const filterObj = (step.filter ?? {}) as Record<string, unknown>
     const params: Record<string, string> = {}
-    if (filterObj && typeof filterObj === 'object') {
-      if (typeof filterObj.simple === 'string') params.simple = filterObj.simple
-      else if (typeof filterObj.xpath === 'string') params.xpath = filterObj.xpath
-    }
-    return { label: 'filter', colour: '#F59E0B', uri: 'filter', params, component: 'filter' }
+    if (typeof filterObj.simple === 'string') params.simple = filterObj.simple
+    else if (typeof filterObj.xpath === 'string') params.xpath = filterObj.xpath
+    return { label: 'filter', colour: '#F59E0B', uri: 'filter', params, component: 'filter', stepKind: 'filter', rawStep: filterObj }
   }
 
   if ('choice' in step) {
-    return { label: 'choice', colour: '#F59E0B', uri: 'choice', params: { hint: 'when/otherwise' }, component: 'choice' }
+    const choiceObj = (step.choice ?? {}) as Record<string, unknown>
+    return { label: 'choice', colour: '#F59E0B', uri: 'choice', params: { hint: 'when/otherwise' }, component: 'choice', stepKind: 'choice', rawStep: choiceObj }
   }
 
   if ('setBody' in step || 'set-body' in step) {
-    const sb = (step.setBody ?? step['set-body']) as Record<string, unknown> | undefined
+    const sb = ((step.setBody ?? step['set-body']) ?? {}) as Record<string, unknown>
     const params: Record<string, string> = {}
-    if (sb && typeof sb === 'object') {
-      if (typeof sb.simple === 'string') params.simple = sb.simple
-      else if (typeof sb.constant === 'string') params.constant = sb.constant
-      else if (typeof sb.jq === 'string') params.jq = sb.jq
-    }
-    return { label: 'setBody', colour: '#8B5CF6', uri: 'setBody', params, component: 'setBody' }
+    if (typeof sb.simple === 'string') params.simple = sb.simple
+    else if (typeof sb.constant === 'string') params.constant = sb.constant
+    else if (typeof sb.jq === 'string') params.jq = sb.jq
+    return { label: 'setBody', colour: '#8B5CF6', uri: 'setBody', params, component: 'setBody', stepKind: 'setBody', rawStep: sb }
   }
 
   if ('setHeader' in step || 'set-header' in step) {
-    const sh = (step.setHeader ?? step['set-header']) as Record<string, unknown> | undefined
+    const sh = ((step.setHeader ?? step['set-header']) ?? {}) as Record<string, unknown>
     const params: Record<string, string> = {}
-    if (sh && typeof sh === 'object') {
-      if (typeof sh.name === 'string') params.name = sh.name
-      if (typeof sh.constant === 'string') params.constant = sh.constant
-      else if (typeof sh.simple === 'string') params.simple = sh.simple
-      else if (typeof sh.xpath === 'string') params.xpath = sh.xpath
-      else if (typeof sh.jq === 'string') params.jq = sh.jq
-    }
-    return { label: 'setHeader', colour: '#8B5CF6', uri: 'setHeader', params, component: 'setHeader' }
+    if (typeof sh.name === 'string') params.name = sh.name
+    if (typeof sh.constant === 'string') params.constant = sh.constant
+    else if (typeof sh.simple === 'string') params.simple = sh.simple
+    else if (typeof sh.xpath === 'string') params.xpath = sh.xpath
+    else if (typeof sh.jq === 'string') params.jq = sh.jq
+    return { label: 'setHeader', colour: '#8B5CF6', uri: 'setHeader', params, component: 'setHeader', stepKind: 'setHeader', rawStep: sh }
   }
 
   if ('removeHeaders' in step || 'remove-headers' in step) {
@@ -223,13 +223,15 @@ function extractStepInfo(step: Record<string, unknown>): StepInfo | null {
         : typeof rh === 'object' && rh !== null && typeof (rh as Record<string, unknown>).pattern === 'string'
         ? ((rh as Record<string, unknown>).pattern as string)
         : '*'
-    return { label: 'removeHeaders', colour: '#8B5CF6', uri: 'removeHeaders', params: { pattern }, component: 'removeHeaders' }
+    const rawStep: Record<string, unknown> = typeof rh === 'string' ? { pattern: rh } : (rh as Record<string, unknown>) ?? { pattern }
+    return { label: 'removeHeaders', colour: '#8B5CF6', uri: 'removeHeaders', params: { pattern }, component: 'removeHeaders', stepKind: 'removeHeaders', rawStep }
   }
 
-  // doTry / do-try — flatten inner steps into the visualization
+  // doTry / do-try — flatten inner steps into the visualization for display;
+  // rawStep carries the full doTry object for serialization round-trips
   if ('doTry' in step || 'do-try' in step) {
-    const tryObj = (step.doTry ?? step['do-try']) as Record<string, unknown> | undefined
-    if (tryObj && Array.isArray(tryObj.steps) && tryObj.steps.length > 0) {
+    const tryObj = ((step.doTry ?? step['do-try']) ?? {}) as Record<string, unknown>
+    if (Array.isArray(tryObj.steps) && tryObj.steps.length > 0) {
       // Return the first meaningful step inside the try block
       for (const inner of tryObj.steps) {
         if (typeof inner === 'object' && inner !== null) {
@@ -238,7 +240,7 @@ function extractStepInfo(step: Record<string, unknown>): StepInfo | null {
         }
       }
     }
-    return { label: 'doTry', colour: '#F59E0B', uri: 'doTry', params: {}, component: 'doTry' }
+    return { label: 'doTry', colour: '#F59E0B', uri: 'doTry', params: {}, component: 'doTry', stepKind: 'doTry', rawStep: tryObj }
   }
 
   return null
@@ -378,6 +380,9 @@ export function parseCamelYaml(yamlText: string): CamelFlowData {
   const nodes: Node[] = []
   const edges: Edge[] = []
 
+  const routeId =
+    routeEntry && typeof routeEntry.route.id === 'string' ? routeEntry.route.id : undefined
+
   // FROM node
   nodes.push({
     id: 'node-0',
@@ -390,6 +395,10 @@ export function parseCamelYaml(yamlText: string): CamelFlowData {
       params: fromParams,
       uri: fromUri,
       component: componentFromUri(fromUri),
+      stepKind: 'from' as const,
+      rawStep: { uri: fromUri, ...(Object.keys(fromParamsBlock).length > 0 ? { parameters: fromParamsBlock } : {}) },
+      stepIndex: 0,
+      ...(routeId ? { routeId } : {}),
     },
     style: getNodeStyle('#22C55E'),
   })
@@ -409,7 +418,15 @@ export function parseCamelYaml(yamlText: string): CamelFlowData {
       position: { x: nodeIndex * H_GAP, y: MAIN_Y },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      data: { label: info.label, params: info.params, uri: info.uri, component: info.component },
+      data: {
+        label: info.label,
+        params: info.params,
+        uri: info.uri,
+        component: info.component,
+        stepKind: info.stepKind,
+        rawStep: info.rawStep,
+        stepIndex: nodeIndex,
+      },
       style: getNodeStyle(info.colour),
     })
     edges.push(makeEdge(`edge-${nodeIndex - 1}-${nodeIndex}`, `node-${nodeIndex - 1}`, nodeId))
@@ -433,7 +450,7 @@ export function parseCamelYaml(yamlText: string): CamelFlowData {
       position: { x: catchX, y: EXCEPTION_Y + blockIdx * 80 },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      data: { label, params: {}, uri: 'doCatch', component: 'doCatch' },
+      data: { label, params: {}, uri: 'doCatch', component: 'doCatch', stepKind: 'doCatch' as const, rawStep: { exception: block.excTypes }, stepIndex: -1, isException: true },
       style: getNodeStyle('#EF4444'),
     })
     edges.push(makeEdge(`catch-edge-${blockIdx}-from`, 'node-0', firstCatchNodeId, '#EF4444'))
@@ -451,7 +468,7 @@ export function parseCamelYaml(yamlText: string): CamelFlowData {
         position: { x: catchX, y: EXCEPTION_Y + blockIdx * 80 },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
-        data: { label: info.label, params: info.params, uri: info.uri, component: info.component },
+        data: { label: info.label, params: info.params, uri: info.uri, component: info.component, stepKind: info.stepKind, rawStep: info.rawStep, stepIndex: -1, isException: true },
         style: getNodeStyle('#EF4444'),
       })
       edges.push(makeEdge(`catch-edge-${blockIdx}-${stepIdx}`, prevCatchNodeId, catchNodeId, '#EF4444'))
@@ -477,7 +494,7 @@ export function parseCamelYaml(yamlText: string): CamelFlowData {
       position: { x: (nodeIndex / 2) * H_GAP, y: EXCEPTION_Y },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      data: { label, params: {}, uri: 'onException', component: 'onException' },
+      data: { label, params: {}, uri: 'onException', component: 'onException', stepKind: 'onException' as const, rawStep: excObj, stepIndex: -1, isException: true },
       style: getNodeStyle('#EF4444'),
     })
     edges.push(makeEdge(`exc-edge-${i}`, 'node-0', excNodeId, '#EF4444'))
@@ -490,7 +507,7 @@ export function parseCamelYaml(yamlText: string): CamelFlowData {
       position: { x: H_GAP, y: MAIN_Y },
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
-      data: { label: 'Processing…', params: {}, uri: '', component: '' },
+      data: { label: 'Processing…', params: {}, uri: '', component: '', stepKind: 'to' as const, rawStep: { uri: '' }, stepIndex: 1 },
       style: getNodeStyle('#3B82F6'),
     })
     edges.push(makeEdge('edge-0-1', 'node-0', 'node-1'))

@@ -11,6 +11,9 @@ import type { ConversationMessage, LLMResponse } from '@/lib/interfaces/ILLMProv
 import type { ExecutionResult } from '@/lib/interfaces/IRouteExecutor'
 import type { ClarificationState } from '@/components/Terminal'
 import type { StreamLine } from '@/components/TestPanel'
+import type { NodeData } from '@/lib/interfaces/INodeData'
+import { parseCamelYaml } from '@/lib/camel-parser'
+import { serializeCamelYaml } from '@/lib/camel-serializer'
 
 const Terminal = dynamic(
   () => import('@/components/Terminal').then((m) => m.Terminal),
@@ -42,10 +45,25 @@ const TestPanel = dynamic(
   { ssr: false, loading: () => <PanelSkeleton dark /> }
 )
 
+const ComponentPalette = dynamic(
+  () => import('@/components/ComponentPalette').then((m) => m.ComponentPalette),
+  { ssr: false, loading: () => <PanelSkeleton /> }
+)
+
+const NodePropertiesPanel = dynamic(
+  () => import('@/components/NodePropertiesPanel').then((m) => m.NodePropertiesPanel),
+  { ssr: false, loading: () => <PanelSkeleton /> }
+)
+
+const MarkdownViewer = dynamic(
+  () => import('@/components/MarkdownViewer').then((m) => m.MarkdownViewer),
+  { ssr: false, loading: () => <PanelSkeleton /> }
+)
+
 interface OpenTab {
   id: string
   name: string
-  type: 'flow' | 'yaml' | 'sequence' | 'properties' | 'xml'
+  type: 'flow' | 'yaml' | 'sequence' | 'properties' | 'markdown'
 }
 
 type BottomTab = 'terminal' | 'testoutput'
@@ -77,8 +95,10 @@ export default function ProjectPage() {
   const [generatedPlantuml, setGeneratedPlantuml] = useState<string | null>(null)
   const [diagramUrl, setDiagramUrl] = useState<string | null>(null)
   const [applicationYaml, setApplicationYaml] = useState<string>('')
-  const [generatedRouteXml, setGeneratedRouteXml] = useState<string>('')
-  const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([])
+const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([])
+
+  // Manual canvas editing
+  const [selectedCanvasNode, setSelectedCanvasNode] = useState<{ id: string; data: NodeData } | null>(null)
 
   // Save indicator
   const [savedIndicator, setSavedIndicator] = useState(false)
@@ -90,6 +110,14 @@ export default function ProjectPage() {
   const [executeError, setExecuteError] = useState<string | null>(null)
   const [jbangMissing, setJbangMissing] = useState(false)
   const [streamLines, setStreamLines] = useState<StreamLine[]>([])
+
+  // Clear canvas node selection when switching away from the Flow tab
+  useEffect(() => {
+    const tab = openTabs.find((t) => t.id === activeTabId)
+    if (tab?.type !== 'flow') {
+      setSelectedCanvasNode(null)
+    }
+  }, [activeTabId, openTabs])
 
   // Keep a ref to applicationYaml for the save handler to always use latest value
   const applicationYamlRef = useRef(applicationYaml)
@@ -108,7 +136,7 @@ export default function ProjectPage() {
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, generatedYaml, generatedRouteXml, generatedPlantuml])
+  }, [projectId, generatedYaml, generatedPlantuml])
 
   // Load saved project files on mount + fire warmup
   useEffect(() => {
@@ -129,7 +157,6 @@ export default function ProjectPage() {
       }
 
       const routeYaml = data.files.find((f) => f.name === 'route.yaml')
-      const routeXml = data.files.find((f) => f.name === 'route.xml')
       const seqPuml = data.files.find((f) => f.name === 'sequence.puml')
       const appYaml = data.files.find((f) => f.name === 'application.yaml')
       const testOut = data.files.find((f) => f.name === 'test-output.txt')
@@ -144,10 +171,6 @@ export default function ProjectPage() {
       if (routeYaml) {
         setGeneratedYaml(routeYaml.content)
         files.push({ name: 'route.yaml', type: 'yaml', content: routeYaml.content, tabTarget: 'yaml' })
-      }
-      if (routeXml) {
-        setGeneratedRouteXml(routeXml.content)
-        files.push({ name: 'route.xml', type: 'xml', content: routeXml.content, tabTarget: 'xml' })
       }
       if (seqPuml) {
         setGeneratedPlantuml(seqPuml.content)
@@ -169,7 +192,7 @@ export default function ProjectPage() {
         files.push({ name: 'test-output.txt', type: 'text', content: testOut.content })
       }
       if (reqMd) {
-        files.push({ name: 'requirements.md', type: 'text', content: reqMd.content })
+        files.push({ name: 'requirements.md', type: 'text', content: reqMd.content, tabTarget: 'markdown' })
       }
 
       setGeneratedFiles(files)
@@ -199,8 +222,7 @@ export default function ProjectPage() {
       const data = (await res.json()) as LLMResponse & {
         error?: string
         applicationYaml?: string
-        routeXml?: string
-        explanation?: string
+explanation?: string
         content?: string
         requirements?: string
       }
@@ -224,7 +246,7 @@ export default function ProjectPage() {
             if (existing) {
               return prev.map((f) => f.name === 'requirements.md' ? { ...f, content: data.requirements! } : f)
             }
-            return [...prev, { name: 'requirements.md', type: 'text' as const, content: data.requirements! }]
+            return [...prev, { name: 'requirements.md', type: 'text' as const, content: data.requirements!, tabTarget: 'markdown' as const }]
           })
         }
         return
@@ -255,9 +277,6 @@ export default function ProjectPage() {
         setApplicationYaml(appYaml)
         applicationYamlRef.current = appYaml
 
-        const routeXml = data.routeXml ?? ''
-        setGeneratedRouteXml(routeXml)
-
         const files: GeneratedFile[] = [
           { name: 'route.flow', type: 'flow', content: '', tabTarget: 'flow' },
           { name: 'route.yaml', type: 'yaml', content: data.yaml, tabTarget: 'yaml' },
@@ -267,9 +286,6 @@ export default function ProjectPage() {
             content: data.plantuml,
             tabTarget: 'sequence',
           },
-          ...(routeXml
-            ? [{ name: 'route.xml', type: 'xml' as const, content: routeXml, tabTarget: 'xml' as const }]
-            : []),
           ...(appYaml
             ? [
                 {
@@ -287,7 +303,7 @@ export default function ProjectPage() {
         if (data.requirements) {
           setGeneratedFiles((prev) => {
             const withoutReq = prev.filter((f) => f.name !== 'requirements.md')
-            return [...withoutReq, { name: 'requirements.md', type: 'text' as const, content: data.requirements! }]
+            return [...withoutReq, { name: 'requirements.md', type: 'text' as const, content: data.requirements!, tabTarget: 'markdown' as const }]
           })
         }
 
@@ -302,6 +318,64 @@ export default function ProjectPage() {
       setGenerateError('Network error — please check your connection and try again')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  // ── Canvas editing handlers ────────────────────────────────────────────────
+
+  function handleCanvasYamlChange(newYaml: string) {
+    setGeneratedYaml(newYaml)
+    setGeneratedFiles((prev) =>
+      prev.map((f) => (f.name === 'route.yaml' ? { ...f, content: newYaml } : f))
+    )
+  }
+
+  function handleNodeSelect(node: { id: string; data: NodeData } | null) {
+    setSelectedCanvasNode(node)
+  }
+
+  function handleNodeDataChange(nodeId: string, updatedData: NodeData) {
+    setSelectedCanvasNode({ id: nodeId, data: updatedData })
+    if (!generatedYaml) return
+    try {
+      const { nodes } = parseCamelYaml(generatedYaml)
+      const updatedNodes = nodes.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: updatedData as unknown as Record<string, unknown> }
+          : n
+      )
+      const newYaml = serializeCamelYaml(updatedNodes)
+      handleCanvasYamlChange(newYaml)
+    } catch {
+      // Ignore serialization errors — node data remains in the panel
+    }
+  }
+
+  function handleNodeDelete(nodeId: string) {
+    if (!generatedYaml) return
+    try {
+      const { nodes } = parseCamelYaml(generatedYaml)
+      const remaining = nodes.filter((n) => n.id !== nodeId)
+      const mainNodes = remaining.filter(
+        (n) => !(n.data as unknown as NodeData).isException
+      )
+      const sorted = [...mainNodes].sort(
+        (a, b) =>
+          (a.data as unknown as NodeData).stepIndex -
+          (b.data as unknown as NodeData).stepIndex
+      )
+      const renumbered = sorted.map((n, idx) => ({
+        ...n,
+        data: { ...(n.data as unknown as NodeData), stepIndex: idx } as unknown as Record<string, unknown>,
+      }))
+      const exceptionNodes = remaining.filter(
+        (n) => (n.data as unknown as NodeData).isException
+      )
+      const newYaml = serializeCamelYaml([...renumbered, ...exceptionNodes])
+      handleCanvasYamlChange(newYaml)
+      setSelectedCanvasNode(null)
+    } catch {
+      // Ignore errors
     }
   }
 
@@ -353,15 +427,6 @@ export default function ProjectPage() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ filename: 'route.yaml', content: generatedYaml }),
-        })
-      )
-    }
-    if (generatedRouteXml) {
-      saves.push(
-        fetch(`/api/projects/${projectId}/files`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filename: 'route.xml', content: generatedRouteXml }),
         })
       )
     }
@@ -472,7 +537,7 @@ export default function ProjectPage() {
 
   function handleFileClick(file: GeneratedFile) {
     if (!file.tabTarget) return
-    const tabType = file.tabTarget as 'flow' | 'yaml' | 'sequence' | 'properties' | 'xml'
+    const tabType = file.tabTarget as 'flow' | 'yaml' | 'sequence' | 'properties' | 'markdown'
     const tabId = file.name
     setOpenTabs((prev) => {
       if (prev.find((t) => t.id === tabId)) return prev
@@ -498,6 +563,7 @@ export default function ProjectPage() {
 
   const activeTab = openTabs.find((t) => t.id === activeTabId) ?? null
   const canRun = !!generatedYaml && !isExecuting
+  const isFlowEditing = activeTab?.type === 'flow'
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
@@ -604,98 +670,112 @@ export default function ProjectPage() {
                 </button>
               </PanelResizeHandle>
 
-              {/* Right panel — dynamic tabs */}
+              {/* Right panel — dynamic tabs + editing sidebar */}
               <Panel defaultSize={82} style={{ overflow: 'hidden' }}>
-                <main className="flex flex-col h-full overflow-hidden">
-                  {/* Tab strip */}
-                  <div className="flex-shrink-0 border-b border-slate-200 bg-white px-4 flex items-end gap-1 min-h-[38px]">
-                    {openTabs.map((tab) => (
-                      <div
-                        key={tab.id}
-                        className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px cursor-pointer transition-colors select-none ${
-                          activeTabId === tab.id
-                            ? 'border-amber-500 text-amber-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
-                        }`}
-                        onClick={() => setActiveTabId(tab.id)}
-                      >
-                        <span>{tab.name}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            closeTab(tab.id)
-                          }}
-                          aria-label={`Close ${tab.name}`}
-                          className="w-3.5 h-3.5 rounded-sm hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center text-[11px] leading-none transition-colors"
+                <div className="flex h-full overflow-hidden">
+                  {/* Main tab area */}
+                  <main className="flex flex-col flex-1 overflow-hidden min-w-0">
+                    {/* Tab strip */}
+                    <div className="flex-shrink-0 border-b border-slate-200 bg-white px-4 flex items-end gap-1 min-h-[38px]">
+                      {openTabs.map((tab) => (
+                        <div
+                          key={tab.id}
+                          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px cursor-pointer transition-colors select-none ${
+                            activeTabId === tab.id
+                              ? 'border-amber-500 text-amber-600'
+                              : 'border-transparent text-slate-500 hover:text-slate-700'
+                          }`}
+                          onClick={() => setActiveTabId(tab.id)}
                         >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    {openTabs.length === 0 && (
-                      <span className="text-xs text-slate-400 py-2 px-1">
-                        Click a file in the panel to open it
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Tab content */}
-                  <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
-                    {activeTab?.type === 'flow' && (
-                      <div className="absolute inset-0">
-                        <RouteCanvas yaml={generatedYaml} />
-                      </div>
-                    )}
-                    {activeTab?.type === 'yaml' && (
-                      <div className="absolute inset-0">
-                        <YamlEditor
-                          value={generatedYaml}
-                          onChange={(v) => {
-                            setGeneratedYaml(v)
-                            setGeneratedFiles((prev) =>
-                              prev.map((f) => (f.name === 'route.yaml' ? { ...f, content: v } : f))
-                            )
-                          }}
-                        />
-                      </div>
-                    )}
-                    {activeTab?.type === 'xml' && (
-                      <div className="absolute inset-0">
-                        <YamlEditor
-                          value={generatedRouteXml}
-                          language="xml"
-                          onChange={(v) => {
-                            setGeneratedRouteXml(v)
-                            setGeneratedFiles((prev) =>
-                              prev.map((f) => (f.name === 'route.xml' ? { ...f, content: v } : f))
-                            )
-                          }}
-                        />
-                      </div>
-                    )}
-                    {activeTab?.type === 'sequence' && (
-                      <div className="absolute inset-0">
-                        <SequenceDiagram diagramUrl={diagramUrl} />
-                      </div>
-                    )}
-                    {activeTab?.type === 'properties' && (
-                      <div className="absolute inset-0">
-                        <PropertiesEditor
-                          value={applicationYaml}
-                          onChange={handlePropertiesChange}
-                          onSave={() => void handleSaveAll()}
-                        />
-                      </div>
-                    )}
-                    {!activeTab && (
-                      <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-                        <div className="text-center">
-                          <p>Click a file in the panel to open it</p>
+                          <span>{tab.name}</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              closeTab(tab.id)
+                            }}
+                            aria-label={`Close ${tab.name}`}
+                            className="w-3.5 h-3.5 rounded-sm hover:bg-slate-200 text-slate-400 hover:text-slate-600 flex items-center justify-center text-[11px] leading-none transition-colors"
+                          >
+                            ×
+                          </button>
                         </div>
-                      </div>
+                      ))}
+                      {openTabs.length === 0 && (
+                        <span className="text-xs text-slate-400 py-2 px-1">
+                          Click a file in the panel to open it
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Tab content */}
+                    <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
+                      {activeTab?.type === 'flow' && (
+                        <div className="absolute inset-0">
+                          <RouteCanvas
+                            yaml={generatedYaml}
+                            onYamlChange={handleCanvasYamlChange}
+                            onNodeSelect={handleNodeSelect}
+                          />
+                        </div>
+                      )}
+                      {activeTab?.type === 'yaml' && (
+                        <div className="absolute inset-0">
+                          <YamlEditor
+                            value={generatedYaml}
+                            onChange={(v) => {
+                              setGeneratedYaml(v)
+                              setGeneratedFiles((prev) =>
+                                prev.map((f) => (f.name === 'route.yaml' ? { ...f, content: v } : f))
+                              )
+                            }}
+                          />
+                        </div>
+                      )}
+{activeTab?.type === 'sequence' && (
+                        <div className="absolute inset-0">
+                          <SequenceDiagram diagramUrl={diagramUrl} />
+                        </div>
+                      )}
+                      {activeTab?.type === 'properties' && (
+                        <div className="absolute inset-0">
+                          <PropertiesEditor
+                            value={applicationYaml}
+                            onChange={handlePropertiesChange}
+                            onSave={() => void handleSaveAll()}
+                          />
+                        </div>
+                      )}
+                      {activeTab?.type === 'markdown' && (
+                        <div className="absolute inset-0">
+                          <MarkdownViewer
+                            content={generatedFiles.find((f) => f.name === activeTab.id)?.content ?? null}
+                          />
+                        </div>
+                      )}
+                      {!activeTab && (
+                        <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                          <div className="text-center">
+                            <p>Click a file in the panel to open it</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </main>
+
+                  {/* Right sidebar: always visible palette / properties when node selected */}
+                  <div className="flex-shrink-0 w-56 border-l border-slate-200 overflow-hidden">
+                    {isFlowEditing && selectedCanvasNode ? (
+                      <NodePropertiesPanel
+                        nodeId={selectedCanvasNode.id}
+                        nodeData={selectedCanvasNode.data}
+                        onChange={handleNodeDataChange}
+                        onDelete={handleNodeDelete}
+                      />
+                    ) : (
+                      <ComponentPalette />
                     )}
                   </div>
-                </main>
+                </div>
               </Panel>
             </PanelGroup>
           </Panel>

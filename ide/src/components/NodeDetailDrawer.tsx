@@ -1,11 +1,7 @@
 'use client'
 
-export interface NodeData {
-  label: string
-  params: Record<string, string>
-  uri: string
-  component: string
-}
+export type { NodeData } from '@/lib/interfaces/INodeData'
+import type { NodeData } from '@/lib/interfaces/INodeData'
 
 interface Props {
   node: NodeData | null

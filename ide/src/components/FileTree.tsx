@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react'
 
-export type FileType = 'yaml' | 'plantuml' | 'properties' | 'text' | 'flow' | 'xml'
+export type FileType = 'yaml' | 'plantuml' | 'properties' | 'text' | 'flow'
 
 export interface GeneratedFile {
   name: string
   type: FileType
   content: string
   editable?: boolean
-  tabTarget?: 'yaml' | 'sequence' | 'properties' | 'flow' | 'xml'
+  tabTarget?: 'yaml' | 'sequence' | 'properties' | 'flow' | 'markdown'
 }
 
 interface ContextMenuState {
@@ -26,12 +26,6 @@ interface Props {
 }
 
 const fileIcons: Record<FileType, React.ReactNode> = {
-  xml: (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
-      <rect x="1" y="1" width="12" height="12" rx="2" stroke="#F97316" strokeWidth="1.2" />
-      <path d="M4 5l-2 2 2 2M10 5l2 2-2 2M7 4l-1 6" stroke="#F97316" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
   flow: (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
       <rect x="1" y="5" width="4" height="4" rx="1" stroke="#F59E0B" strokeWidth="1.2" />
@@ -74,7 +68,6 @@ const fileIcons: Record<FileType, React.ReactNode> = {
 const fileLabels: Record<FileType, string> = {
   flow: 'Flow Diagram',
   yaml: 'Camel Route',
-  xml: 'Camel XML DSL',
   plantuml: 'Sequence Diagram',
   properties: 'Configuration',
   text: 'Output',
